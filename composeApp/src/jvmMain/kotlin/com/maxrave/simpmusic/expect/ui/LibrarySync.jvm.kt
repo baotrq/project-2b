@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.maxrave.domain.data.model.librarysync.LibrarySyncPairingState
+import com.maxrave.simpmusic.ui.component.QrCode
 import com.maxrave.domain.data.model.librarysync.LibrarySyncProblem
 import com.maxrave.domain.data.model.librarysync.SyncPeer
 import com.maxrave.domain.repository.LibrarySyncHostRepository

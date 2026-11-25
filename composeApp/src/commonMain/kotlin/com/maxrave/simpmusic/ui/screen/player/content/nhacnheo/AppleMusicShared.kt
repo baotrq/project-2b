@@ -39,6 +39,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -58,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -122,6 +127,8 @@ import com.maxrave.simpmusic.ui.icon.VolumeDown
 import com.maxrave.simpmusic.ui.icon.VolumeUp
 import com.maxrave.simpmusic.ui.screen.player.content.NowPlayingContentActions
 import com.maxrave.simpmusic.ui.screen.player.content.NowPlayingContentState
+import com.maxrave.simpmusic.ui.screen.player.ArtworkSeekAction
+import com.maxrave.simpmusic.ui.screen.player.computeSeekAction
 import com.maxrave.simpmusic.ui.theme.LocalDesktopShell
 import com.maxrave.simpmusic.ui.theme.typo
 import com.maxrave.simpmusic.viewModel.UIEvent
@@ -131,6 +138,7 @@ import simpmusic.composeapp.generated.resources.live_badge
 import simpmusic.composeapp.generated.resources.lyrics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -485,90 +493,6 @@ internal fun Modifier.appleMusicPanelFingerTracker(
         }
     }
 
-// How far the compact header has to be dragged sideways to change track, and the flick that does
-// it at any distance.
-private val TRACK_SWIPE_DISTANCE = 64.dp
-private const val TRACK_SWIPE_VELOCITY = 900f
-
-// How long the header keeps showing a swiped-to song before falling back to the screen data, in
-// case the player never reports the change (a failed load, a queue edit in between).
-private const val PENDING_TRACK_TIMEOUT_MS = 4_000L
-
-/**
- * Fork: swipe the compact header left for the next track, right for the previous one. The row
- * follows the finger directly and springs back once released, so the gesture feels attached to
- * it; the track change itself is just the transport command. Vertical drags are left alone, so
- * the panel's own swipe down still works from the header.
- */
-@Composable
-internal fun Modifier.appleMusicTrackSwipe(
-    enabled: Boolean,
-    onNext: () -> Unit,
-    onPrevious: () -> Unit,
-): Modifier {
-    val currentOnNext by rememberUpdatedState(onNext)
-    val currentOnPrevious by rememberUpdatedState(onPrevious)
-    var shift by remember { mutableFloatStateOf(0f) }
-    val settle = remember { Animatable(0f) }
-    var settleJob by remember { mutableStateOf<Job?>(null) }
-    val scope = rememberCoroutineScope()
-    if (!enabled) return this
-    // Measure on the stationary parent; translating the detector distorts the finger's velocity.
-    return pointerInput(Unit) {
-        val threshold = TRACK_SWIPE_DISTANCE.toPx()
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            var travelled = 0f
-            var origin = 0f
-            val start =
-                awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
-                    change.consume()
-                    settleJob?.cancel()
-                    origin = shift
-                    travelled = over
-                    shift = origin + travelled
-                } ?: return@awaitEachGesture
-            val tracker = VelocityTracker()
-            tracker.addPosition(down.uptimeMillis, down.position)
-            tracker.addPosition(start.uptimeMillis, start.position)
-            val completed =
-                horizontalDrag(start.id) { change ->
-                    travelled += change.positionChange().x
-                    tracker.addPosition(change.uptimeMillis, change.position)
-                    change.consume()
-                    shift = origin + travelled
-                }
-            if (completed) {
-                currentEvent.changes.firstOrNull { it.id == start.id }?.let { up ->
-                    tracker.addPosition(up.uptimeMillis, up.position)
-                }
-            }
-            val velocity = if (completed) tracker.calculateVelocity().x else 0f
-            val direction =
-                when {
-                    completed && (travelled < -threshold || velocity < -TRACK_SWIPE_VELOCITY) -> -1f
-                    completed && (travelled > threshold || velocity > TRACK_SWIPE_VELOCITY) -> 1f
-                    else -> 0f
-                }
-            settleJob = scope.launch {
-                settle.snapTo(shift)
-                if (direction != 0f) {
-                    if (direction < 0f) currentOnNext() else currentOnPrevious()
-                }
-                // Continue from the release position. No second swipe or jump to the opposite side.
-                settle.animateTo(
-                    0f,
-                    spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
-                    initialVelocity = velocity,
-                ) { shift = value }
-            }
-        }
-    }.graphicsLayer {
-        translationX = shift
-        alpha = 1f - (abs(shift) / (size.width.coerceAtLeast(1f) * 0.8f)).coerceIn(0f, 1f)
-    }
-}
-
 /**
  * One 25dp glyph button with a tight circular ripple — [IconButton] sized and clipped exactly
  * like Classic/M3E's plain icon buttons (Info, PlaylistAdd, Queue, Replay5…), not a custom
@@ -668,52 +592,154 @@ internal fun AppleMusicCompactHeader(
     actions: NowPlayingContentActions,
     typography: AppleMusicTypography,
     modifier: Modifier = Modifier,
-    // Fork: the Lyrics page lets the header be swiped sideways to change track.
+    // Fork: on the Lyrics page the song part of the header is a pager over the queue.
     swipeToChangeTrack: Boolean = false,
 ) {
-    // Fork: the song a swipe has just asked for, read straight off the queue. The player takes a
-    // moment to switch, so without this the row slid back in still showing the OLD song and then
-    // jumped to the new one a beat later — which read as a second swipe. It is shown until the
-    // screen data catches up with it (or gives up after a few seconds).
-    var pendingIndex by remember { mutableStateOf<Int?>(null) }
-    var titleAtSwipe by remember { mutableStateOf("") }
-    val pendingTrack = pendingIndex?.let { state.artworkQueue.getOrNull(it) }
-    LaunchedEffect(state.screenData.nowPlayingTitle, state.currentOrderIndex) {
-        if (pendingIndex != null && state.currentOrderIndex == pendingIndex && state.screenData.nowPlayingTitle != titleAtSwipe) {
-            pendingIndex = null
-        }
-    }
-    LaunchedEffect(pendingIndex) {
-        if (pendingIndex != null) {
-            delay(PENDING_TRACK_TIMEOUT_MS)
-            pendingIndex = null
-        }
-    }
-    val swipeTo: (Int) -> Unit = { step ->
-        val target = (pendingIndex ?: state.currentOrderIndex) + step
-        if (state.artworkQueue.getOrNull(target) != null) {
-            if (pendingIndex == null) titleAtSwipe = state.screenData.nowPlayingTitle
-            pendingIndex = target
-        }
-        actions.onUIEvent(if (step > 0) UIEvent.Next else UIEvent.SkipToPrevious)
-    }
-    val title = pendingTrack?.title ?: state.screenData.nowPlayingTitle
-    val artist = pendingTrack?.artists?.joinToString { it.name } ?: state.screenData.artistName
-    val thumbnail = pendingTrack?.thumbnails?.maxByOrNull { it.width * it.height }?.url ?: state.screenData.thumbnailURL
-    // The picture last on screen stands in while the next one loads, instead of the grey holder.
-    var lastThumbnail by remember { mutableStateOf<String?>(null) }
-
     Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .appleMusicTrackSwipe(
-                    enabled = swipeToChangeTrack,
-                    onNext = { if (state.controllerState.isNextAvailable) swipeTo(1) },
-                    onPrevious = { if (state.controllerState.isPreviousAvailable) swipeTo(-1) },
-                ).padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (swipeToChangeTrack && state.artworkQueue.isNotEmpty()) {
+            AppleMusicHeaderTrackPager(
+                state = state,
+                actions = actions,
+                typography = typography,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            AppleMusicHeaderTrack(
+                title = state.screenData.nowPlayingTitle,
+                artist = state.screenData.artistName,
+                thumbnail = state.screenData.thumbnailURL,
+                isExplicit = state.screenData.isExplicit,
+                typography = typography,
+                onArtistClick = actions.onNavigateToArtist,
+                modifier = Modifier.weight(1f).padding(start = 20.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        AppleMusicHeaderActions(
+            state = state,
+            actions = actions,
+            showPlayPause = true,
+            showMore = LocalDesktopShell.current,
+            modifier = Modifier.padding(end = 20.dp),
+        )
+    }
+}
+
+/**
+ * Fork: the song in the Lyrics page's header, as a pager over the queue. The row follows the
+ * finger, the next or previous song slides in beside it, and the page it settles on is played,
+ * the same rules the mini player's bar and the Now Playing artwork pager use (ArtworkPagerLogic).
+ * A fling moves one song at most. The page's own 20dp start gutter sits inside the pager, so a
+ * song slides out at the screen edge rather than being cut off 20dp in.
+ */
+@Composable
+private fun AppleMusicHeaderTrackPager(
+    state: NowPlayingContentState,
+    actions: NowPlayingContentActions,
+    typography: AppleMusicTypography,
+    modifier: Modifier = Modifier,
+) {
+    val queue = state.artworkQueue
+    val orderIndex = state.currentOrderIndex
+    val pagerState =
+        rememberPagerState(
+            initialPage = orderIndex.coerceIn(0, (queue.size - 1).coerceAtLeast(0)),
+            pageCount = { queue.size.coerceAtLeast(1) },
+        )
+    val dragged by pagerState.interactionSource.collectIsDraggedAsState()
+    // A real finger swipe waiting to become a track change; programmatic scrolls never set it.
+    var pendingSwipe by remember { mutableStateOf(false) }
+    LaunchedEffect(dragged) { if (dragged) pendingSwipe = true }
+    // Player -> pager: follow track changes made anywhere else (transport, queue, track end). Keyed
+    // on the index alone, so a swipe the player has not caught up with yet is not pulled back.
+    LaunchedEffect(orderIndex) {
+        if (!dragged && orderIndex in queue.indices && orderIndex != pagerState.currentPage) {
+            pendingSwipe = false
+            if (abs(orderIndex - pagerState.currentPage) <= 1) {
+                pagerState.animateScrollToPage(orderIndex)
+            } else {
+                pagerState.scrollToPage(orderIndex)
+            }
+        }
+    }
+    // Pager -> player: a swipe that settles on another song plays it.
+    val latestOrderIndex by rememberUpdatedState(orderIndex)
+    val latestQueueSize by rememberUpdatedState(queue.size)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { settled ->
+                if (!pendingSwipe) return@collect
+                pendingSwipe = false
+                if (settled !in 0 until latestQueueSize || settled == latestOrderIndex) return@collect
+                when (val action = computeSeekAction(settled, latestOrderIndex)) {
+                    ArtworkSeekAction.Next -> actions.onUIEvent(UIEvent.Next)
+                    ArtworkSeekAction.Previous -> actions.onUIEvent(UIEvent.SkipToPrevious)
+                    is ArtworkSeekAction.Skip -> actions.onSeekToQueueIndex(action.index)
+                    ArtworkSeekAction.NoOp -> Unit
+                }
+            }
+    }
+    LaunchedEffect(queue.size) {
+        if (queue.isNotEmpty() && pagerState.currentPage >= queue.size) {
+            runCatching { pagerState.scrollToPage(queue.lastIndex) }
+        }
+    }
+
+    HorizontalPager(
+        state = pagerState,
+        modifier = modifier,
+        beyondViewportPageCount = 1,
+        flingBehavior =
+            PagerDefaults.flingBehavior(
+                state = pagerState,
+                pagerSnapDistance = PagerSnapDistance.atMost(1),
+            ),
+        key = { page -> queue.getOrNull(page)?.videoId?.let { "$it#$page" } ?: "empty#$page" },
+    ) { page ->
+        val track = queue.getOrNull(page)
+        // The playing song reads the screen data, which is exact (explicit badge, best artwork);
+        // the songs beside it read the queue.
+        val isCurrent = page == orderIndex || track == null
+        AppleMusicHeaderTrack(
+            title = if (isCurrent) state.screenData.nowPlayingTitle else track?.title.orEmpty(),
+            artist =
+                if (isCurrent) {
+                    state.screenData.artistName
+                } else {
+                    track?.artists?.joinToString { it.name }.orEmpty()
+                },
+            thumbnail =
+                if (isCurrent) {
+                    state.screenData.thumbnailURL
+                } else {
+                    track?.thumbnails?.maxByOrNull { it.width * it.height }?.url
+                },
+            isExplicit = isCurrent && state.screenData.isExplicit,
+            typography = typography,
+            onArtistClick = if (isCurrent) actions.onNavigateToArtist else null,
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp),
+        )
+    }
+}
+
+/** Thumbnail + title + artist: one song's part of the compact header. */
+@Composable
+private fun AppleMusicHeaderTrack(
+    title: String,
+    artist: String,
+    thumbnail: String?,
+    isExplicit: Boolean,
+    typography: AppleMusicTypography,
+    onArtistClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    // The picture last on screen stands in while the next one loads, instead of the grey holder.
+    var lastThumbnail by remember { mutableStateOf<String?>(null) }
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(
             model =
                 ImageRequest
@@ -745,7 +771,7 @@ internal fun AppleMusicCompactHeader(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (pendingTrack == null && state.screenData.isExplicit) {
+                if (isExplicit) {
                     ExplicitBadge(modifier = Modifier.size(20.dp).padding(end = 4.dp))
                 }
                 Text(
@@ -753,17 +779,10 @@ internal fun AppleMusicCompactHeader(
                     style = typography.compactArtist,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable { actions.onNavigateToArtist() },
+                    modifier = if (onArtistClick != null) Modifier.clickable(onClick = onArtistClick) else Modifier,
                 )
             }
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        AppleMusicHeaderActions(
-            state = state,
-            actions = actions,
-            showPlayPause = true,
-            showMore = LocalDesktopShell.current,
-        )
     }
 }
 

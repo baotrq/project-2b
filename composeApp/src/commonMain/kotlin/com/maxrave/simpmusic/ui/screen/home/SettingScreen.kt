@@ -2057,15 +2057,6 @@ fun SettingScreen(
                         onClick = { showLibrarySyncDialog = true },
                     )
                 }
-                if (personalToolsShown) {
-                    SettingGroup(
-                        title = stringResource(Res.string.playback_sync),
-                        footer = { Text(stringResource(Res.string.playback_sync_footer), style = typo().bodySmall) },
-                    ) {
-                        PlaybackSyncSettingItems()
-                        LyricsFixesAdminKeyItem()
-                    }
-                }
                 SettingGroup(title = stringResource(Res.string.proxy)) {
                     SettingItem(
                         icon = SimpIcons.VpnLock,
@@ -2911,6 +2902,16 @@ fun SettingScreen(
                             navController.navigate(AppLogDestination)
                         },
                     )
+                }
+                // Fork: the owner's own sync server, among the hidden tools (seven taps on Version).
+                if (personalToolsShown) {
+                    SettingGroup(
+                        title = stringResource(Res.string.playback_sync),
+                        footer = { Text(stringResource(Res.string.playback_sync_footer), style = typo().bodySmall) },
+                    ) {
+                        PlaybackSyncSettingItems()
+                        LyricsFixesAdminKeyItem()
+                    }
                 }
                 if (getPlatform() == Platform.Android && personalToolsShown) {
                     SettingGroup(title = stringResource(Res.string.car_mode)) {

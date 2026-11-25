@@ -104,12 +104,14 @@ kotlin {
             implementation(libs.camera.camera2)
             implementation(libs.camera.lifecycle)
             implementation(libs.camera.view)
-            implementation(libs.zxing.core)
 
             // Login WebViews: startUpWebView moves Chromium startup off the main thread
             implementation(libs.androidx.webkit)
         }
         commonMain.dependencies {
+            // QR codes: drawn on both platforms (login sync, sync setup), read by the Android scanner.
+            // commonMain targets only Android and JVM, so a JVM library is fine here.
+            implementation(libs.zxing.core)
             implementation(libs.runtime)
             implementation(libs.foundation)
             implementation(libs.compose.material3)
@@ -200,8 +202,6 @@ kotlin {
             // Paints the native Windows title bar (already at runtime through the mpv module).
             implementation(libs.jna)
             implementation(projects.mediaJvmUi)
-            // Login sync QR code
-            implementation(libs.zxing.core)
         }
     }
 }

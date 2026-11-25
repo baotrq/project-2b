@@ -29,6 +29,7 @@ import com.maxrave.domain.data.model.canvas.CanvasResult
 import com.maxrave.domain.data.model.download.DownloadProgress
 import com.maxrave.domain.data.model.intent.GenericIntent
 import com.maxrave.domain.data.model.metadata.Lyrics
+import com.maxrave.domain.data.model.metadata.YouTubeCaptionTrack
 import com.maxrave.domain.data.model.promo.Promo
 import com.maxrave.domain.data.model.streams.TimeLine
 import com.maxrave.domain.data.model.update.UpdateData
@@ -1948,7 +1949,11 @@ class SharedViewModel(
         duration: Int,
     ) {
         lyricsCanvasRepository
-            .getYouTubeCaption(dataStoreManager.youtubeSubtitleLanguage.first(), videoId)
+            .getYouTubeCaption(
+                dataStoreManager.youtubeSubtitleLanguage.first(),
+                videoId,
+                songCaptionTrack(videoId).first()?.takeIf { it.isNotEmpty() },
+            )
             .cancellable()
             .collect { response ->
                 val data = response.data
@@ -2291,6 +2296,26 @@ class SharedViewModel(
                 _nowPlayingScreenData.update { it.copy(lyricsData = null) }
                 setLyricsProvider()
             }
+        }
+    }
+
+    /** The YouTube transcript picked for one song (its id); empty or null = the one in the sung language. */
+    fun songCaptionTrack(videoId: String): Flow<String?> = dataStoreManager.getString(SongLyricsSync.captionTrackKey(videoId))
+
+    /** The transcripts YouTube has for [videoId], for the per-song picker. */
+    suspend fun youTubeCaptionTracks(videoId: String): List<YouTubeCaptionTrack> = lyricsCanvasRepository.getYouTubeCaptionTracks(videoId)
+
+    /**
+     * Picks the YouTube transcript for one song ("" = the sung language). Picking one also makes
+     * YouTube that song's source, since the pick means nothing for any other source.
+     */
+    fun setSongCaptionTrack(
+        videoId: String,
+        trackId: String,
+    ) {
+        viewModelScope.launch {
+            dataStoreManager.putString(SongLyricsSync.captionTrackKey(videoId), trackId)
+            setSongLyricsProvider(videoId, DataStoreManager.YOUTUBE)
         }
     }
 

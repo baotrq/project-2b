@@ -128,6 +128,7 @@ import com.maxrave.domain.data.entities.SongEntity
 import com.maxrave.domain.data.model.download.DownloadProgress
 import com.maxrave.domain.data.model.searchResult.playlists.PlaylistsResult
 import com.maxrave.domain.data.model.searchResult.songs.Artist
+import com.maxrave.domain.data.model.metadata.YouTubeCaptionTrack
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.AddToQueueBlock
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
@@ -269,6 +270,9 @@ import simpmusic.composeapp.generated.resources.line_synced
 import simpmusic.composeapp.generated.resources.unsynced
 import simpmusic.composeapp.generated.resources.spotify
 import simpmusic.composeapp.generated.resources.lyrics_source_automatic
+import simpmusic.composeapp.generated.resources.youtube_transcript_loading
+import simpmusic.composeapp.generated.resources.youtube_transcript_none
+import simpmusic.composeapp.generated.resources.youtube_transcript_sung_language
 import simpmusic.composeapp.generated.resources.lyrics_source_in_use
 import simpmusic.composeapp.generated.resources.lyrics_source_looking
 import simpmusic.composeapp.generated.resources.lyrics_source_none
@@ -1718,6 +1722,48 @@ fun NowPlayingBottomSheet(
                                     style = typo().bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
+                            }
+                        }
+                        // The transcripts this video has, while YouTube is this song's source: YouTube
+                        // lists them in no useful order, so the sung language is the default.
+                        if (option == DataStoreManager.YOUTUBE && selected == DataStoreManager.YOUTUBE) {
+                            val captionTrack by remember(videoId) { sharedViewModel.songCaptionTrack(videoId) }.collectAsState(null)
+                            val tracks by produceState<List<YouTubeCaptionTrack>?>(null, videoId) {
+                                value = sharedViewModel.youTubeCaptionTracks(videoId)
+                            }
+                            val pickTrack = { id: String ->
+                                pickedHere = true
+                                sharedViewModel.setSongCaptionTrack(videoId, id)
+                            }
+                            Column(Modifier.padding(start = 36.dp)) {
+                                when {
+                                    tracks == null ->
+                                        Text(
+                                            text = stringResource(Res.string.youtube_transcript_loading),
+                                            style = typo().bodySmall,
+                                            modifier = Modifier.padding(4.dp),
+                                        )
+                                    tracks.isNullOrEmpty() ->
+                                        Text(
+                                            text = stringResource(Res.string.youtube_transcript_none),
+                                            style = typo().bodySmall,
+                                            modifier = Modifier.padding(4.dp),
+                                        )
+                                    else -> {
+                                        val picked = captionTrack.orEmpty().takeIf { id -> tracks.orEmpty().any { it.id == id } }.orEmpty()
+                                        (listOf("" to stringResource(Res.string.youtube_transcript_sung_language)) +
+                                            tracks.orEmpty().map { it.id to it.name }).forEach { (id, name) ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().clickable { pickTrack(id) },
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                RadioButton(selected = picked == id, onClick = { pickTrack(id) })
+                                                Spacer(modifier = Modifier.size(6.dp))
+                                                Text(text = name, style = typo().bodySmall, modifier = Modifier.weight(1f))
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

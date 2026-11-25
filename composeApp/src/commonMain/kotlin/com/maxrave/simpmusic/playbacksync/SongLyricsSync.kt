@@ -25,7 +25,8 @@ private const val TAG = "SongLyricsSync"
 
 /**
  * One song's lyrics fixes, shared between devices through the playback-sync server: the source
- * chosen for it (empty = the main provider) and the user's own lyrics. Lyrics are only ever
+ * chosen for it (empty = the main provider), the YouTube transcript picked for it (empty = the
+ * sung language) and the user's own lyrics. Lyrics are only ever
  * removed on another device when [lyricsRemoved] is set, which only the delete button does:
  * a record with no lyrics and no flag (a source change from a phone that has none, or a record
  * from an older build) leaves the receiving device's lyrics alone.
@@ -33,6 +34,7 @@ private const val TAG = "SongLyricsSync"
 @Serializable
 private data class SongLyricsState(
     val provider: String = "",
+    val captionTrack: String = "",
     val lyrics: Lyrics? = null,
     val lyricsRemoved: Boolean = false,
     val updatedAt: Long,
@@ -55,6 +57,9 @@ object SongLyricsSync {
     const val NO_LYRICS = "none"
 
     fun providerKey(videoId: String) = "lyrics_provider_song_$videoId"
+
+    /** The YouTube transcript (its `vssId`) picked for one song; empty = the one in the sung language. */
+    fun captionTrackKey(videoId: String) = "youtube_caption_song_$videoId"
 
     private fun syncedAtKey(videoId: String) = "lyrics_song_synced_at_$videoId"
 
@@ -92,7 +97,13 @@ object SongLyricsSync {
         if (state == null) {
             // Fixes made before this device synced them (or while offline) have never been
             // uploaded: share them now, while the song is being looked at.
-            if (local == null && (CustomLyrics.exists(videoId) || !dataStore.getString(providerKey(videoId)).first().isNullOrEmpty())) {
+            if (local == null &&
+                (
+                    CustomLyrics.exists(videoId) ||
+                        !dataStore.getString(providerKey(videoId)).first().isNullOrEmpty() ||
+                        !dataStore.getString(captionTrackKey(videoId)).first().isNullOrEmpty()
+                )
+            ) {
                 push(videoId, dataStore)
             }
             return
@@ -105,6 +116,7 @@ object SongLyricsSync {
             }
         }
         dataStore.putString(providerKey(videoId), state.provider)
+        dataStore.putString(captionTrackKey(videoId), state.captionTrack)
         dataStore.putString(syncedAtKey(videoId), state.updatedAt.toString())
         Logger.i(TAG, "Took the lyrics fixes for $videoId from another device")
         // The server lost (or never had) lyrics this device still holds: put them back.
@@ -139,6 +151,7 @@ object SongLyricsSync {
             val state =
                 SongLyricsState(
                     provider = dataStore.getString(providerKey(videoId)).first().orEmpty(),
+                    captionTrack = dataStore.getString(captionTrackKey(videoId)).first().orEmpty(),
                     lyrics = lyrics,
                     lyricsRemoved = removed && lyrics == null,
                     updatedAt = System.currentTimeMillis(),
