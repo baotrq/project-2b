@@ -52,6 +52,7 @@ import com.maxrave.simpmusic.utils.VersionManager
 import com.maxrave.simpmusic.viewModel.SharedViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import multiplatform.network.cmptoast.AppContext
 import org.koin.android.ext.android.inject
 import org.koin.core.context.loadKoinModules
 import org.koin.core.context.unloadKoinModules
@@ -63,6 +64,9 @@ import java.util.concurrent.TimeUnit
 
 // Process-wide, so a recreated activity (rotation, theme change) does not count as opening the app.
 private var lastLibrarySyncAt = 0L
+
+// The activity whose display toasts currently go to (see onStart).
+private var toastActivity: java.lang.ref.WeakReference<MainActivity>? = null
 
 @Suppress("DEPRECATION")
 class MainActivity : AppCompatActivity() {
@@ -93,6 +97,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        // Toasts go to the display of the context they are made from. The application context's
+        // display is the phone's built-in screen, which is off in Samsung DeX, so every toast was
+        // drawn there and never seen. While this activity is on screen, toasts use its display.
+        toastActivity = java.lang.ref.WeakReference(this)
+        AppContext.set(this)
         startMusicService()
         // Every return to the screen asks; the pass itself runs at most once a day.
         viewModel.runSmartDownloadsIfDue()
@@ -110,6 +119,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        // cmptoast holds its context weakly and throws once it is collected, so a stopped (and
+        // maybe soon destroyed) activity hands it back. A newer activity already started keeps its own.
+        if (toastActivity?.get() === this) {
+            toastActivity = null
+            AppContext.set(applicationContext)
+        }
         if (shouldUnbind) {
             unbindService(serviceConnection)
         }

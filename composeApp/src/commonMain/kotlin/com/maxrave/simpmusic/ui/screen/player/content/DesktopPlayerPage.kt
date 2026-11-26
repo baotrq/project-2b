@@ -8,6 +8,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.rememberUpdatedState
+import com.maxrave.simpmusic.ui.screen.player.ArtworkSeekAction
+import com.maxrave.simpmusic.ui.screen.player.computeSeekAction
+import com.maxrave.simpmusic.viewModel.UIEvent
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.abs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -255,9 +266,12 @@ private fun DesktopPlayerArtworkColumn(
                         // A video keeps its picture whole; the cover and a canvas melt into the page.
                         .then(if (showVideo) Modifier.clip(RoundedCornerShape(12.dp)) else Modifier.meltEdges(COVER_MELT_FRACTION)),
               ) {
-                DesktopPlayerCover(
+                DesktopPlayerCoverPager(
                     state = state,
-                    onBitmap = actions.onArtworkBitmap,
+                    actions = actions,
+                    // A video or canvas sits over the cover and would stay put while the page slid
+                    // away under it; the deck stands in for the cover during a crossfade.
+                    swipeEnabled = !showVideo && !showCanvas && !crossfadeDeck.active,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (showVideo) {
@@ -325,13 +339,109 @@ private fun DesktopPlayerArtworkColumn(
     }
 }
 
+/**
+ * The cover as a pager over the queue, so a song slides in when it changes (transport, capsule,
+ * queue, track end) and a swipe (touch in DeX, a mouse drag on Desktop) changes it, as the phone's
+ * artwork does. Same rules as the Nhạc Nhẽo header pager: one song per fling, only a real drag plays
+ * a song, and a change made elsewhere moves the pager without being sent back.
+ */
 @Composable
-private fun DesktopPlayerCover(
+private fun DesktopPlayerCoverPager(
     state: NowPlayingContentState,
-    onBitmap: (ImageBitmap) -> Unit,
+    actions: NowPlayingContentActions,
+    swipeEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    var artworkUrl by remember(state.screenData.thumbnailURL) { mutableStateOf(state.screenData.thumbnailURL) }
+    val queue = state.artworkQueue
+    val orderIndex = state.currentOrderIndex
+    val pagerState =
+        rememberPagerState(
+            initialPage = orderIndex.coerceIn(0, (queue.size - 1).coerceAtLeast(0)),
+            pageCount = { queue.size.coerceAtLeast(1) },
+        )
+    val dragged by pagerState.interactionSource.collectIsDraggedAsState()
+    var pendingSwipe by remember { mutableStateOf(false) }
+    LaunchedEffect(dragged) { if (dragged) pendingSwipe = true }
+    // Player -> pager.
+    LaunchedEffect(orderIndex) {
+        if (!dragged && orderIndex in queue.indices && orderIndex != pagerState.currentPage) {
+            pendingSwipe = false
+            if (abs(orderIndex - pagerState.currentPage) <= 1) {
+                pagerState.animateScrollToPage(orderIndex)
+            } else {
+                pagerState.scrollToPage(orderIndex)
+            }
+        }
+    }
+    // Pager -> player: a swipe that settles on another song plays it.
+    val latestOrderIndex by rememberUpdatedState(orderIndex)
+    val latestQueueSize by rememberUpdatedState(queue.size)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { settled ->
+                if (!pendingSwipe) return@collect
+                pendingSwipe = false
+                if (settled !in 0 until latestQueueSize || settled == latestOrderIndex) return@collect
+                when (val action = computeSeekAction(settled, latestOrderIndex)) {
+                    ArtworkSeekAction.Next -> actions.onUIEvent(UIEvent.Next)
+                    ArtworkSeekAction.Previous -> actions.onUIEvent(UIEvent.SkipToPrevious)
+                    is ArtworkSeekAction.Skip -> actions.onSeekToQueueIndex(action.index)
+                    ArtworkSeekAction.NoOp -> Unit
+                }
+            }
+    }
+    LaunchedEffect(queue.size) {
+        if (queue.isNotEmpty() && pagerState.currentPage >= queue.size) {
+            runCatching { pagerState.scrollToPage(queue.lastIndex) }
+        }
+    }
+
+    HorizontalPager(
+        state = pagerState,
+        modifier = modifier,
+        userScrollEnabled = swipeEnabled,
+        beyondViewportPageCount = 1,
+        flingBehavior =
+            PagerDefaults.flingBehavior(
+                state = pagerState,
+                pagerSnapDistance = PagerSnapDistance.atMost(1),
+            ),
+        key = { page -> queue.getOrNull(page)?.videoId?.let { "$it#$page" } ?: "empty#$page" },
+    ) { page ->
+        val track = queue.getOrNull(page)
+        // The playing song reads the screen data (best artwork, and it feeds the backdrop's colours);
+        // the songs beside it read the queue.
+        val isCurrent = page == orderIndex || track == null
+        DesktopPlayerCover(
+            url =
+                if (isCurrent) {
+                    state.screenData.thumbnailURL
+                } else {
+                    track?.thumbnails?.maxByOrNull { it.width * it.height }?.url
+                },
+            onBitmap = if (isCurrent) actions.onArtworkBitmap else null,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun DesktopPlayerCover(
+    url: String?,
+    onBitmap: ((ImageBitmap) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    var artworkUrl by remember(url) { mutableStateOf(url) }
+    // The next song's cover loads while it is still a side page, so it is kept and handed to the
+    // backdrop when the page becomes the current one: the image does not load again then, and
+    // waiting for another onSuccess left the background on the previous song's colours.
+    var loaded by remember(url) { mutableStateOf<ImageBitmap?>(null) }
+    val reportBitmap = onBitmap != null
+    LaunchedEffect(reportBitmap, loaded) {
+        val bitmap = loaded
+        if (bitmap != null) onBitmap?.invoke(bitmap)
+    }
     AsyncImage(
         model =
             ImageRequest
@@ -346,7 +456,7 @@ private fun DesktopPlayerCover(
         contentDescription = null,
         contentScale = ContentScale.Crop,
         // What the backdrop's colours are read from.
-        onSuccess = { onBitmap(it.result.image.toImageBitmap()) },
+        onSuccess = { result -> loaded = result.result.image.toImageBitmap() },
         // maxresdefault is missing for plenty of videos.
         onError = {
             val fallback = artworkUrl?.replace("maxresdefault", "hqdefault")
