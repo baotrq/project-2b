@@ -67,9 +67,13 @@ npx wrangler pages deploy
 
 Tables are created on the first request.
 
-- **Review:** open https://nhacnheo.pages.dev/lyrics/admin, enter the key, and approve or reject.
-  A source pick shows what the sender's device displayed, but only the pick is published; each device
-  then fetches the words from that source itself, so a provider's lyrics are never republished here.
+- **Publishing:** a fix goes live the moment it is sent; nothing waits for approval. Only a source
+  pick is published, never the words the sender's device showed; each device then fetches the words
+  from that source itself, so a provider's lyrics are never republished here.
+- **Log and revert:** open https://nhacnheo.pages.dev/lyrics/admin and enter the key. Every change is
+  listed (from a user, from your devices, or a revert), with what it replaced. Revert puts back what
+  was live before it. Only a song's latest change can be reverted, so newer ones are never lost, and
+  a revert is logged too, so it can be undone. Everything is kept in the `fix_log` table.
 - **Your own devices:** enter the key under Settings → Playback sync → Lyrics fixes admin key (hidden
   tools). "Share this fix" then publishes at once.
 - **Limits:** 30 suggestions per install and 60 per network address a day. A new suggestion from the same

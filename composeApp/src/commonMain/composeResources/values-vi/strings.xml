@@ -1222,11 +1222,11 @@
     <string name="turn_off_proxy">Tắt proxy</string>
     <string name="lyrics_provider_community">Bản sửa của cộng đồng</string>
     <string name="lyrics_fix_share">Chia sẻ bản sửa với mọi người</string>
-    <string name="lyrics_fix_share_description">Gửi lời hoặc nguồn bạn chọn để duyệt. Khi được duyệt, mọi người dùng Nhạc Nhẽo đều nhận được.</string>
+    <string name="lyrics_fix_share_description">Chia sẻ lời hoặc nguồn bạn chọn tới mọi người dùng Nhạc Nhẽo, ngay lập tức.</string>
     <string name="lyrics_fix_share_description_admin">Đăng ngay lời hoặc nguồn bạn chọn cho mọi người dùng Nhạc Nhẽo.</string>
     <string name="lyrics_fix_share_title">Chia sẻ bản sửa này?</string>
     <string name="lyrics_fix_share_message">Ứng dụng sẽ gửi bài hát, lời của bạn hoặc nguồn bạn chọn, cùng một mã ngẫu nhiên của bản cài đặt này tới máy chủ của Nhạc Nhẽo. Không gửi gì khác về bạn.</string>
-    <string name="lyrics_fix_sent">Đã gửi để duyệt. Cảm ơn bạn!</string>
+    <string name="lyrics_fix_sent">Đã chia sẻ với mọi người. Cảm ơn bạn!</string>
     <string name="lyrics_fix_published">Đã đăng cho mọi người</string>
     <string name="lyrics_fix_too_many">Hôm nay bạn đã gửi quá nhiều. Hãy thử lại vào ngày mai.</string>
     <string name="lyrics_fix_failed">Không gửi được bản sửa. Hãy kiểm tra kết nối mạng.</string>

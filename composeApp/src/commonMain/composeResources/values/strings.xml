@@ -1330,11 +1330,11 @@
     <string name="turn_off_proxy">Turn off proxy</string>
     <string name="lyrics_provider_community">Community fix</string>
     <string name="lyrics_fix_share">Share this fix with everyone</string>
-    <string name="lyrics_fix_share_description">Sends your lyrics or source pick for review. Once approved, every Nhạc Nhẽo user gets it.</string>
+    <string name="lyrics_fix_share_description">Shares your lyrics or source pick with every Nhạc Nhẽo user, right away.</string>
     <string name="lyrics_fix_share_description_admin">Publishes your lyrics or source pick for every Nhạc Nhẽo user now.</string>
     <string name="lyrics_fix_share_title">Share this fix?</string>
     <string name="lyrics_fix_share_message">This sends the song, your lyrics or the source you picked, and a random id for this install to Nhạc Nhẽo's server. Nothing else about you is sent.</string>
-    <string name="lyrics_fix_sent">Sent for review. Thank you!</string>
+    <string name="lyrics_fix_sent">Shared with everyone. Thank you!</string>
     <string name="lyrics_fix_published">Published for everyone</string>
     <string name="lyrics_fix_too_many">Too many suggestions today. Try again tomorrow.</string>
     <string name="lyrics_fix_failed">Couldn't send the fix. Check your connection.</string>
