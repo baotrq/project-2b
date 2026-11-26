@@ -436,6 +436,12 @@ fun App(
                         }
                     }
 
+                    // simpmusic://wear — opened from the Wear OS watch app when it asked the phone to
+                    // play something while the phone's player was not running. Opening the app is
+                    // the whole job: WearPhoneLink holds the request and plays it once the player
+                    // service is up, so there is nothing to navigate to.
+                    "wear" -> Unit
+
                     // simpmusic://recognize — the Quick Settings tile (Android only): Search with the
                     // song recognition sheet open.
                     "recognize" -> {

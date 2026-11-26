@@ -32,6 +32,7 @@ import com.maxrave.simpmusic.expect.isOnUnmeteredNetwork
 import com.maxrave.simpmusic.led.LedStripSync
 import com.maxrave.simpmusic.playbacksync.PlaybackSync
 import com.maxrave.simpmusic.playbacksync.SettingsSync
+import com.maxrave.simpmusic.wear.WearPhoneLink
 import com.maxrave.simpmusic.service.backup.AutoBackupScheduler
 import com.maxrave.simpmusic.service.sync.LibrarySyncScheduler
 import com.maxrave.simpmusic.utils.NetworkFirstInterceptor
@@ -124,6 +125,11 @@ class SimpMusicApplication :
 
         // Car LED strip follows the artwork colour; idle unless enabled in Settings → LED strip.
         LedStripSync.start(this, dataStoreManager, get<MediaPlayerHandler>())
+
+        // Wear OS remote: answers the watch app (Full build; a no-op on FOSS). Inside onCreate,
+        // because Play services starts WearBridgeService right after the Application when a watch
+        // message wakes a dead process.
+        WearPhoneLink.start(this)
 
         // Library sync (#2663): LAN rounds with the paired computer.
         val librarySyncScheduler = LibrarySyncScheduler(this, get<LibrarySyncPhoneRepository>())

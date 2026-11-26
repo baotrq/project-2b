@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- tools:keep belongs on <resources>: Play services reads this array by name, so release resource
+     shrinking would otherwise be free to drop it. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- Lets the watch app find this phone. Must equal WearPaths.PHONE_CAPABILITY. -->
+    <string-array name="android_wear_capabilities">
+        <item>simpmusic_phone</item>
+    </string-array>
+</resources>

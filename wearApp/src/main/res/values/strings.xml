@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SimpMusic</string>
+    <string name="nothing_playing">Nothing playing</string>
+    <string name="connecting">Connecting to your phone…</string>
+    <string name="no_phone">Phone not connected</string>
+    <string name="no_phone_detail">Install SimpMusic on the paired phone and keep it nearby.</string>
+    <string name="player_not_running">SimpMusic isn\'t open on your phone</string>
+    <string name="open_on_phone">Open on phone</string>
+    <string name="opened_on_phone">Check your phone</string>
+    <string name="library">Library</string>
+    <string name="queue">Up next</string>
+    <string name="queue_empty">Nothing up next</string>
+    <string name="shuffle_all">Shuffle</string>
+    <string name="songs_count">%1$d songs</string>
+    <string name="retry">Retry</string>
+    <string name="load_failed">Couldn\'t reach your phone</string>
+    <string name="empty_list">Nothing here yet</string>
+    <string name="play_pause">Play or pause</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+    <string name="like">Like</string>
+    <string name="volume">Volume</string>
+    <string name="live">LIVE</string>
+</resources>

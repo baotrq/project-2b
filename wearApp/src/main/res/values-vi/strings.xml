@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nothing_playing">Chưa phát gì</string>
+    <string name="connecting">Đang kết nối với điện thoại…</string>
+    <string name="no_phone">Chưa kết nối điện thoại</string>
+    <string name="no_phone_detail">Cài SimpMusic trên điện thoại đã ghép nối và để điện thoại ở gần.</string>
+    <string name="player_not_running">SimpMusic chưa mở trên điện thoại</string>
+    <string name="open_on_phone">Mở trên điện thoại</string>
+    <string name="opened_on_phone">Xem điện thoại của bạn</string>
+    <string name="library">Thư viện</string>
+    <string name="queue">Tiếp theo</string>
+    <string name="queue_empty">Không còn bài tiếp theo</string>
+    <string name="shuffle_all">Phát ngẫu nhiên</string>
+    <string name="songs_count">%1$d bài</string>
+    <string name="retry">Thử lại</string>
+    <string name="load_failed">Không kết nối được với điện thoại</string>
+    <string name="empty_list">Chưa có gì</string>
+    <string name="play_pause">Phát hoặc tạm dừng</string>
+    <string name="next">Bài tiếp</string>
+    <string name="previous">Bài trước</string>
+    <string name="like">Thích</string>
+    <string name="volume">Âm lượng</string>
+    <string name="live">TRỰC TIẾP</string>
+</resources>

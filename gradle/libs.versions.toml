@@ -19,6 +19,10 @@ work = "2.12.0"
 startup-runtime = "1.2.0"
 media3 = "1.11.1"
 play-services-cast-framework = "23.0.0"
+# Wear OS remote (watch app + phone-side Data Layer bridge, Full build only on the phone)
+play-services-wearable = "20.0.1"
+wear-compose = "1.7.2"
+wear-remote-interactions = "1.2.0"
 mediarouter = "1.8.1"
 car-app = "1.9.0-alpha03"
 androidx-media = "1.8.0"
@@ -263,6 +267,12 @@ material = { group = "com.google.android.material", name = "material", version.r
 
 #Google Cast
 play-services-cast-framework = { group = "com.google.android.gms", name = "play-services-cast-framework", version.ref = "play-services-cast-framework" }
+play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "play-services-wearable" }
+kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines-android" }
+wear-compose-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "wear-compose" }
+wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wear-compose" }
+wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wear-compose" }
+wear-remote-interactions = { group = "androidx.wear", name = "wear-remote-interactions", version.ref = "wear-remote-interactions" }
 androidx-mediarouter = { group = "androidx.mediarouter", name = "mediarouter", version.ref = "mediarouter" }
 
 [plugins]

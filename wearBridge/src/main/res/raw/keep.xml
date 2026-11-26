@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play services reads the capability array by name; release resource shrinking honours tools:keep
+     only here, not in a values file. Without it the watch cannot find the phone (simpmusic_phone). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@array/android_wear_capabilities" />

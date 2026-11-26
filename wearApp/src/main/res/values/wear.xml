@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kept through res/raw/keep.xml: Play services reads this array by name, so nothing in the
+     code references it and release resource shrinking would otherwise drop it — the phone then
+     never sees a watch and never publishes now playing. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- Lets the phone see that a watch with this app is reachable. Must equal WearPaths.WATCH_CAPABILITY. -->
+    <string-array name="android_wear_capabilities">
+        <item>simpmusic_watch</item>
+    </string-array>
+</resources>

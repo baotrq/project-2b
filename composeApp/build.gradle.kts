@@ -100,6 +100,15 @@ kotlin {
                 implementation(projects.castEmpty)
             }
 
+            // Wear OS remote: the watch app talks to this phone over the Data Layer (GMS), so the
+            // real bridge ships in Full builds only; FOSS gets a no-op with the same API.
+            implementation(projects.wearProtocol)
+            if (isFullBuild) {
+                implementation(projects.wearBridge)
+            } else {
+                implementation(projects.wearBridgeEmpty)
+            }
+
             // Login sync QR scanner: CameraX + ZXing, not ML Kit, which F-Droid rejects as proprietary
             implementation(libs.camera.camera2)
             implementation(libs.camera.lifecycle)

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play services reads the capability array by name, so nothing in the code references it. Release
+     resource shrinking ignores tools:keep in a values file; this is the place it reads. Without it the
+     phone never sees the watch (capability simpmusic_watch) and never publishes now playing. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@array/android_wear_capabilities" />
